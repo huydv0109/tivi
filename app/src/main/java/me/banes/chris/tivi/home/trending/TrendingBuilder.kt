@@ -25,7 +25,6 @@ import me.banes.chris.tivi.inject.ViewModelKey
 
 @Module
 internal abstract class TrendingBuilder {
-
     @ContributesAndroidInjector
     internal abstract fun trendingShowsFragment(): TrendingShowsFragment
 
@@ -33,5 +32,4 @@ internal abstract class TrendingBuilder {
     @IntoMap
     @ViewModelKey(TrendingShowsViewModel::class)
     abstract fun bindTrendingShowsViewModel(viewModel: TrendingShowsViewModel): ViewModel
-
 }

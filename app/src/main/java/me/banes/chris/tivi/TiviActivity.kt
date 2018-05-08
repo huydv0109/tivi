@@ -16,28 +16,47 @@
 
 package me.banes.chris.tivi
 
-import android.support.v7.app.AppCompatDelegate
+import android.app.Activity
+import android.content.Intent
+import android.os.Bundle
+import com.crashlytics.android.Crashlytics
+import com.crashlytics.android.core.CrashlyticsCore
 import dagger.android.support.DaggerAppCompatActivity
-import me.banes.chris.tivi.settings.TiviPreferences
-import me.banes.chris.tivi.settings.TiviPreferences.UiTheme.DAY
-import me.banes.chris.tivi.settings.TiviPreferences.UiTheme.DAYNIGHT
-import me.banes.chris.tivi.settings.TiviPreferences.UiTheme.NIGHT
-import javax.inject.Inject
+import io.fabric.sdk.android.Fabric
 
 /**
  * Base Activity class which supports LifecycleOwner and Dagger injection.
  */
 abstract class TiviActivity : DaggerAppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-    @Inject protected lateinit var preferences: TiviPreferences
+        val crashlyticsCore = CrashlyticsCore.Builder().disabled(BuildConfig.DEBUG).build()
+        val crashlytics = Crashlytics.Builder().core(crashlyticsCore).build()
+        Fabric.with(this, crashlytics)
+    }
 
-    override fun onStart() {
-        super.onStart()
+    override fun onPostCreate(savedInstanceState: Bundle?) {
+        super.onPostCreate(savedInstanceState)
+        handleIntent(intent)
+    }
 
-        when (preferences.uiThemePreference) {
-            DAY -> delegate.setLocalNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-            NIGHT -> delegate.setLocalNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            DAYNIGHT -> delegate.setLocalNightMode(AppCompatDelegate.MODE_NIGHT_AUTO)
-        }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    open fun handleIntent(intent: Intent) {}
+
+    override fun finishAfterTransition() {
+        val resultData = Intent()
+        val result = onPopulateResultIntent(resultData)
+        setResult(result, resultData)
+
+        super.finishAfterTransition()
+    }
+
+    open fun onPopulateResultIntent(intent: Intent): Int {
+        return Activity.RESULT_OK
     }
 }

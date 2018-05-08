@@ -25,19 +25,21 @@ import me.banes.chris.tivi.home.discover.DiscoverBuilder
 import me.banes.chris.tivi.home.library.LibraryBuilder
 import me.banes.chris.tivi.home.popular.PopularBuilder
 import me.banes.chris.tivi.home.trending.TrendingBuilder
+import me.banes.chris.tivi.home.watched.MyShowsBuilder
 import me.banes.chris.tivi.home.watched.WatchedShowsBuilder
 import me.banes.chris.tivi.inject.ViewModelKey
 
 @Module
 internal abstract class HomeBuilder {
-
-    @ContributesAndroidInjector(modules = arrayOf(
-            HomeModule::class,
-            DiscoverBuilder::class,
-            TrendingBuilder::class,
-            PopularBuilder::class,
-            LibraryBuilder::class,
-            WatchedShowsBuilder::class))
+    @ContributesAndroidInjector(modules = [
+        HomeModule::class,
+        DiscoverBuilder::class,
+        TrendingBuilder::class,
+        PopularBuilder::class,
+        LibraryBuilder::class,
+        WatchedShowsBuilder::class,
+        MyShowsBuilder::class
+    ])
     internal abstract fun homeActivity(): HomeActivity
 
     @Binds
@@ -45,4 +47,8 @@ internal abstract class HomeBuilder {
     @ViewModelKey(HomeActivityViewModel::class)
     abstract fun bindHomeActivityViewModel(viewModel: HomeActivityViewModel): ViewModel
 
+    @Binds
+    @IntoMap
+    @ViewModelKey(HomeNavigatorViewModel::class)
+    abstract fun bindHomeNavigatorViewModel(viewModel: HomeNavigatorViewModel): ViewModel
 }

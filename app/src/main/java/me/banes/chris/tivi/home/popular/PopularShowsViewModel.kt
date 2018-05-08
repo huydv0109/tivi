@@ -16,20 +16,27 @@
 
 package me.banes.chris.tivi.home.popular
 
-import me.banes.chris.tivi.calls.PopularCall
+import me.banes.chris.tivi.SharedElementHelper
 import me.banes.chris.tivi.data.entities.PopularListItem
 import me.banes.chris.tivi.home.HomeNavigator
+import me.banes.chris.tivi.tmdb.TmdbManager
+import me.banes.chris.tivi.trakt.calls.PopularCall
+import me.banes.chris.tivi.util.AppCoroutineDispatchers
 import me.banes.chris.tivi.util.AppRxSchedulers
 import me.banes.chris.tivi.util.EntryViewModel
 import javax.inject.Inject
 
 class PopularShowsViewModel @Inject constructor(
-        schedulers: AppRxSchedulers,
-        call: PopularCall,
-        private val navigator: HomeNavigator
-) : EntryViewModel<PopularListItem>(schedulers, call) {
-
-    fun onUpClicked() {
+    schedulers: AppRxSchedulers,
+    coroutineDispatchers: AppCoroutineDispatchers,
+    call: PopularCall,
+    tmdbManager: TmdbManager
+) : EntryViewModel<PopularListItem>(schedulers, coroutineDispatchers, call, tmdbManager) {
+    fun onUpClicked(navigator: HomeNavigator) {
         navigator.onUpClicked()
+    }
+
+    fun onItemClicked(item: PopularListItem, navigator: HomeNavigator, sharedElements: SharedElementHelper?) {
+        navigator.showShowDetails(item.show!!, sharedElements)
     }
 }

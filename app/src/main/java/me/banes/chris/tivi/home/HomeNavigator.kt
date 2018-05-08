@@ -16,12 +16,14 @@
 
 package me.banes.chris.tivi.home
 
+import me.banes.chris.tivi.SharedElementHelper
 import me.banes.chris.tivi.data.entities.TiviShow
 
 interface HomeNavigator {
-    fun showPopular()
-    fun showTrending()
-    fun showWatched()
-    fun showShowDetails(show: TiviShow)
+    fun showPopular(sharedElements: SharedElementHelper?)
+    fun showTrending(sharedElements: SharedElementHelper?)
+    fun showWatched(sharedElements: SharedElementHelper?)
+    fun showMyShows(sharedElements: SharedElementHelper?)
+    fun showShowDetails(show: TiviShow, sharedElements: SharedElementHelper?)
     fun onUpClicked()
 }

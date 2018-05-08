@@ -16,31 +16,52 @@
 
 package me.banes.chris.tivi.util
 
-import android.arch.lifecycle.MutableLiveData
+import android.arch.lifecycle.LiveData
+import android.arch.lifecycle.LiveDataReactiveStreams
+import android.arch.paging.LivePagedListBuilder
 import android.arch.paging.PagedList
-import me.banes.chris.tivi.api.Resource
+import io.reactivex.BackpressureStrategy
+import io.reactivex.rxkotlin.Flowables
+import io.reactivex.subjects.BehaviorSubject
 import me.banes.chris.tivi.api.Status
+import me.banes.chris.tivi.api.UiResource
 import me.banes.chris.tivi.calls.ListCall
 import me.banes.chris.tivi.calls.PaginatedCall
 import me.banes.chris.tivi.data.Entry
 import me.banes.chris.tivi.data.entities.ListItem
-import me.banes.chris.tivi.extensions.plusAssign
+import me.banes.chris.tivi.tmdb.TmdbManager
 import timber.log.Timber
 
 open class EntryViewModel<LI : ListItem<out Entry>>(
-        val schedulers: AppRxSchedulers,
-        val call: ListCall<Unit, LI>,
-        refreshOnStartup: Boolean = true) : RxAwareViewModel() {
+    private val schedulers: AppRxSchedulers,
+    private val dispatchers: AppCoroutineDispatchers,
+    private val call: ListCall<Unit, LI>,
+    tmdbManager: TmdbManager,
+    refreshOnStartup: Boolean = true
+) : TiviViewModel() {
+
+    private val messages = BehaviorSubject.create<UiResource>()
 
     val liveList by lazy(mode = LazyThreadSafetyMode.NONE) {
-        call.liveList().create(0,
-                PagedList.Config.Builder()
-                        .setPageSize(call.pageSize)
-                        .setEnablePlaceholders(true)
-                        .build())
+        LivePagedListBuilder<Int, LI>(
+                call.dataSourceFactory(),
+                PagedList.Config.Builder().run {
+                    setPageSize(call.pageSize * 3)
+                    setPrefetchDistance(call.pageSize)
+                    setEnablePlaceholders(false)
+                    build()
+                }
+        ).run {
+            build()
+        }
     }
 
-    val messages = MutableLiveData<Resource>()
+    val viewState: LiveData<EntryViewState> = LiveDataReactiveStreams.fromPublisher(
+            Flowables.combineLatest(
+                    messages.toFlowable(BackpressureStrategy.LATEST),
+                    tmdbManager.imageProvider,
+                    ::EntryViewState)
+    )
 
     init {
         // Eagerly refresh the initial page of trending
@@ -51,26 +72,40 @@ open class EntryViewModel<LI : ListItem<out Entry>>(
 
     fun onListScrolledToEnd() {
         if (call is PaginatedCall<*, *>) {
-            disposables += call.loadNextPage()
-                    .observeOn(schedulers.main)
-                    .doOnSubscribe { messages.value = Resource(Status.LOADING_MORE) }
-                    .subscribe(this::onSuccess, this::onError)
+            launchWithParent(dispatchers.main) {
+                sendMessage(UiResource(Status.LOADING_MORE))
+                try {
+                    call.loadNextPage()
+                    onSuccess()
+                } catch (e: Exception) {
+                    onError(e)
+                }
+            }
         }
     }
 
     fun fullRefresh() {
-        disposables += call.refresh(Unit)
-                .observeOn(schedulers.main)
-                .doOnSubscribe { messages.value = Resource(Status.REFRESHING) }
-                .subscribe(this::onSuccess, this::onError)
+        launchWithParent(dispatchers.main) {
+            sendMessage(UiResource(Status.REFRESHING))
+            try {
+                call.refresh(Unit)
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e)
+            }
+        }
     }
 
     private fun onError(t: Throwable) {
         Timber.e(t)
-        messages.value = Resource(Status.ERROR, t.localizedMessage)
+        sendMessage(UiResource(Status.ERROR, t.localizedMessage))
     }
 
     private fun onSuccess() {
-        messages.value = Resource(Status.SUCCESS)
+        sendMessage(UiResource(Status.SUCCESS))
+    }
+
+    private fun sendMessage(uiResource: UiResource) {
+        messages.onNext(uiResource)
     }
 }

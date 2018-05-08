@@ -19,26 +19,31 @@ package me.banes.chris.tivi.inject
 import android.content.Context
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
-import com.uwetrottmann.tmdb2.Tmdb
 import dagger.Module
 import dagger.Provides
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.rx2.asCoroutineDispatcher
+import me.banes.chris.tivi.AppNavigator
 import me.banes.chris.tivi.BuildConfig
+import me.banes.chris.tivi.TiviAppNavigator
 import me.banes.chris.tivi.TiviApplication
-import me.banes.chris.tivi.appmanagers.AppManagers
-import me.banes.chris.tivi.appmanagers.LeakCanaryManager
-import me.banes.chris.tivi.appmanagers.ThreeTenBpManager
-import me.banes.chris.tivi.appmanagers.TimberManager
+import me.banes.chris.tivi.actions.TiviActions
+import me.banes.chris.tivi.actions.TiviActionsImpl
+import me.banes.chris.tivi.appinitializers.AndroidJobInitializer
+import me.banes.chris.tivi.appinitializers.AppInitializers
+import me.banes.chris.tivi.appinitializers.ThreeTenBpInitializer
+import me.banes.chris.tivi.appinitializers.TimberInitializer
+import me.banes.chris.tivi.util.AppCoroutineDispatchers
 import me.banes.chris.tivi.util.AppRxSchedulers
-import okhttp3.Cache
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import java.io.File
 import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
 class AppModule {
-
     @Provides
     fun provideContext(application: TiviApplication): Context {
         return application.applicationContext
@@ -46,23 +51,23 @@ class AppModule {
 
     @Singleton
     @Provides
-    fun provideTmdb(@Named("cache") cacheDir: File, interceptor: HttpLoggingInterceptor): Tmdb {
-        return object : Tmdb(BuildConfig.TMDB_API_KEY) {
-            override fun setOkHttpClientDefaults(builder: OkHttpClient.Builder) {
-                super.setOkHttpClientDefaults(builder)
-                builder.apply {
-                    addInterceptor(interceptor)
-                    cache(Cache(File(cacheDir, "tmdb_cache"), 10 * 1024 * 1024))
-                }
-            }
-        }
+    fun provideRxSchedulers(): AppRxSchedulers {
+        return AppRxSchedulers(
+                Schedulers.single(),
+                Schedulers.io(),
+                Schedulers.io(),
+                AndroidSchedulers.mainThread()
+        )
     }
 
     @Singleton
     @Provides
-    fun provideRxSchedulers(): AppRxSchedulers {
-        return AppRxSchedulers()
-    }
+    fun provideCoroutineDispatchers(schedulers: AppRxSchedulers) = AppCoroutineDispatchers(
+            database = schedulers.database.asCoroutineDispatcher(),
+            disk = schedulers.disk.asCoroutineDispatcher(),
+            network = schedulers.network.asCoroutineDispatcher(),
+            main = UI
+    )
 
     @Named("app")
     @Provides
@@ -80,9 +85,46 @@ class AppModule {
 
     @Provides
     fun provideAppManagers(
-            leakCanaryManager: LeakCanaryManager,
-            timberManager: TimberManager,
-            threeTenManager: ThreeTenBpManager): AppManagers {
-        return AppManagers(leakCanaryManager, timberManager, threeTenManager)
+        androidJobInitializer: AndroidJobInitializer,
+        timberManager: TimberInitializer,
+        threeTenManager: ThreeTenBpInitializer
+    ): AppInitializers {
+        return AppInitializers(androidJobInitializer, timberManager, threeTenManager)
     }
+
+    @Provides
+    @Singleton
+    @Named("app")
+    fun provideAppNavigator(context: Context): AppNavigator {
+        return TiviAppNavigator(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTiviActions(): TiviActions {
+        return TiviActionsImpl()
+    }
+
+    @Provides
+    @Named("tmdb-api")
+    fun provideTmdbApiKey(): String {
+        return BuildConfig.TMDB_API_KEY
+    }
+
+    @Provides
+    @Named("trakt-client-id")
+    fun provideTraktClientId(): String {
+        return BuildConfig.TRAKT_CLIENT_ID
+    }
+
+    @Provides
+    @Named("trakt-client-secret")
+    fun provideTraktClientSecret(): String {
+        return BuildConfig.TRAKT_CLIENT_SECRET
+    }
+
+    @Singleton
+    @Provides
+    @ApplicationLevel
+    fun provideCompositeDisposable() = CompositeDisposable()
 }

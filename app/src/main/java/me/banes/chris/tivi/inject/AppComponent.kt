@@ -20,24 +20,30 @@ import dagger.Component
 import dagger.android.AndroidInjector
 import dagger.android.support.AndroidSupportInjectionModule
 import me.banes.chris.tivi.TiviApplication
+import me.banes.chris.tivi.data.DatabaseModule
 import me.banes.chris.tivi.home.HomeBuilder
-import me.banes.chris.tivi.settings.SettingsBuilder
+import me.banes.chris.tivi.jobs.JobsCreator
+import me.banes.chris.tivi.showdetails.ShowDetailsBuilder
+import me.banes.chris.tivi.tmdb.TmdbModule
+import me.banes.chris.tivi.trakt.TraktAuthModule
 import me.banes.chris.tivi.trakt.TraktModule
 import javax.inject.Singleton
 
 @Singleton
-@Component(modules = arrayOf(
-        AndroidSupportInjectionModule::class,
-        AppModule::class,
-        DatabaseModule::class,
-        ViewModelBuilder::class,
-        HomeBuilder::class,
-        TraktModule::class,
-        NetworkModule::class,
-        SettingsBuilder::class))
+@Component(modules = [
+    AndroidSupportInjectionModule::class,
+    AppModule::class,
+    JobsCreator::class,
+    DatabaseModule::class,
+    ViewModelBuilder::class,
+    HomeBuilder::class,
+    ShowDetailsBuilder::class,
+    TraktModule::class,
+    TraktAuthModule::class,
+    TmdbModule::class,
+    NetworkModule::class
+])
 interface AppComponent : AndroidInjector<TiviApplication> {
-
     @Component.Builder
     abstract class Builder : AndroidInjector.Builder<TiviApplication>()
-
 }

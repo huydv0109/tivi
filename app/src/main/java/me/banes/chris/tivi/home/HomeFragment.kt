@@ -16,14 +16,15 @@
 
 package me.banes.chris.tivi.home
 
-import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProvider
 import android.os.Bundle
+import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import me.banes.chris.tivi.R
 import me.banes.chris.tivi.TiviFragment
 import me.banes.chris.tivi.extensions.loadIconFromUrl
+import me.banes.chris.tivi.extensions.observeK
 import javax.inject.Inject
 
 abstract class HomeFragment<VM : HomeFragmentViewModel> : TiviFragment() {
@@ -31,10 +32,10 @@ abstract class HomeFragment<VM : HomeFragmentViewModel> : TiviFragment() {
     @Inject lateinit var viewModelFactory: ViewModelProvider.Factory
     internal lateinit var viewModel: VM
 
-    override fun onViewCreated(view: View?, savedInstanceState: Bundle?) {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        viewModel.authUiState.observe(this, Observer {
+        viewModel.authUiState.observeK(this) {
             when (it) {
                 HomeFragmentViewModel.AuthUiState.LOGGED_IN -> {
                     findUserAvatarMenuItem()?.isVisible = true
@@ -45,20 +46,20 @@ abstract class HomeFragment<VM : HomeFragmentViewModel> : TiviFragment() {
                     findUserLoginMenuItem()?.isVisible = true
                 }
             }
-        })
+        }
 
-        viewModel.userProfileLiveData.observe(this, Observer { user ->
+        viewModel.userProfileLiveData.observeK(this) { user ->
             if (user != null) {
                 findUserAvatarMenuItem()?.let {
                     it.title = user.name
                     if (user.avatarUrl != null) {
-                        it.loadIconFromUrl(context, user.avatarUrl)
+                        it.loadIconFromUrl(context!!, user.avatarUrl!!)
                     }
                 }
             } else {
                 // TODO clear user profile
             }
-        })
+        }
     }
 
     open fun onMenuItemClicked(item: MenuItem) = when (item.itemId) {
@@ -70,14 +71,16 @@ abstract class HomeFragment<VM : HomeFragmentViewModel> : TiviFragment() {
             viewModel.onLoginItemClicked()
             true
         }
-        R.id.home_menu_settings -> {
-            viewModel.onSettingsItemClicked()
-            true
-        }
         else -> false
     }
 
-    abstract fun findUserAvatarMenuItem(): MenuItem?
-    abstract fun findUserLoginMenuItem(): MenuItem?
+    open fun findUserAvatarMenuItem(): MenuItem? {
+        return getMenu()?.findItem(R.id.home_menu_user_avatar)
+    }
 
+    open fun findUserLoginMenuItem(): MenuItem? {
+        return getMenu()?.findItem(R.id.home_menu_user_login)
+    }
+
+    open fun getMenu(): Menu? = null
 }

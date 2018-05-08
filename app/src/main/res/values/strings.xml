@@ -22,18 +22,41 @@
     <string name="home_nav_library">Library</string>
 
     <string name="discover_title">Discover</string>
-    <string name="discover_my_shows">My Shows</string>
     <string name="discover_trending">Trending</string>
     <string name="discover_popular">Popular</string>
 
     <string name="library_title">Library</string>
+    <string name="library_myshows">My Shows</string>
     <string name="library_watched">Watched</string>
 
     <string name="login">Login</string>
     <string name="header_more">More</string>
 
-    <string name="prefs_ui_category_title">User Interface</string>
-    <string name="prefs_ui_theme_title">Theme</string>
-    <string name="prefs_title">Settings</string>
     <string name="empty_prompt">Y u no watch some TV?</string>
+    <string name="empty_emoji">😏</string>
+
+    <string name="details_related">Related shows</string>
+
+    <string name="percentage_format">%1$d%%</string>
+    <string name="minutes_format">%1$dm</string>
+
+    <string name="rating_content_description_format">Rating: %1$d%%</string>
+    <string name="network_content_description_format">Network: %1$s</string>
+    <string name="certificate_content_description_format">Certificate: %1$s</string>
+    <plurals name="runtime_content_description_format">
+        <item quantity="one">Runtime: %1$d minute</item>
+        <item quantity="other">Runtime: %1$d minutes</item>
+    </plurals>
+
+    <string name="genre_label_drama">Drama</string>
+    <string name="genre_label_fantasy">Fantasy</string>
+    <string name="genre_label_science_fiction">Science Fiction</string>
+    <string name="genre_label_action">Action</string>
+    <string name="genre_label_adventure">Adventure</string>
+    <string name="genre_label_crime">Crime</string>
+    <string name="genre_label_thriller">Thriller</string>
+    <string name="genre_label_comedy">Comedy</string>
+    <string name="genre_label_horror">Horror</string>
+    <string name="genre_label_mystery">Mystery</string>
+
 </resources>

@@ -16,9 +16,55 @@
 
 package me.banes.chris.tivi
 
+import android.os.Bundle
+import android.support.transition.TransitionInflater
+import android.view.ViewGroup
+import androidx.core.view.doOnPreDraw
 import dagger.android.support.DaggerFragment
 
 /**
  * Base fragment class which supports LifecycleOwner and Dagger injection.
  */
-abstract class TiviFragment : DaggerFragment()
+abstract class TiviFragment : DaggerFragment() {
+
+    private var startedTransition = false
+    private var postponed = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        TransitionInflater.from(context).run {
+            enterTransition = inflateTransition(R.transition.fragment_enter)
+            exitTransition = inflateTransition(R.transition.fragment_exit)
+        }
+    }
+
+    override fun postponeEnterTransition() {
+        super.postponeEnterTransition()
+        postponed = true
+    }
+
+    override fun onStart() {
+        super.onStart()
+
+        if (postponed && !startedTransition) {
+            // If we're postponed and haven't started a transition yet, we'll delay for a max of 200ms
+            view?.postDelayed(this::scheduleStartPostponedTransitions, 200)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        startedTransition = false
+    }
+
+    protected fun scheduleStartPostponedTransitions() {
+        if (!startedTransition) {
+            (view?.parent as? ViewGroup)?.doOnPreDraw {
+                startPostponedEnterTransition()
+                activity?.startPostponedEnterTransition()
+            }
+            startedTransition = true
+        }
+    }
+}

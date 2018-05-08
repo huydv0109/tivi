@@ -16,24 +16,54 @@
 
 package me.banes.chris.tivi.home.trending
 
+import android.arch.lifecycle.ViewModelProviders
 import android.os.Bundle
 import android.view.View
 import kotlinx.android.synthetic.main.fragment_rv_grid.*
+import me.banes.chris.tivi.PosterGridItemBindingModel_
 import me.banes.chris.tivi.R
+import me.banes.chris.tivi.SharedElementHelper
 import me.banes.chris.tivi.data.entities.TrendingListItem
+import me.banes.chris.tivi.home.HomeNavigator
+import me.banes.chris.tivi.home.HomeNavigatorViewModel
+import me.banes.chris.tivi.util.EntryGridEpoxyController
 import me.banes.chris.tivi.util.EntryGridFragment
 
 class TrendingShowsFragment : EntryGridFragment<TrendingListItem, TrendingShowsViewModel>(TrendingShowsViewModel::class.java) {
 
+    private lateinit var homeNavigator: HomeNavigator
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        homeNavigator = ViewModelProviders.of(activity!!, viewModelFactory).get(HomeNavigatorViewModel::class.java)
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        toolbar.apply {
+        grid_toolbar.apply {
             title = getString(R.string.discover_trending)
             setNavigationOnClickListener {
-                viewModel.onUpClicked()
+                viewModel.onUpClicked(homeNavigator)
             }
         }
     }
 
+    override fun createController(): EntryGridEpoxyController<TrendingListItem> {
+        return object : EntryGridEpoxyController<TrendingListItem>() {
+            override fun buildItemModel(item: TrendingListItem): PosterGridItemBindingModel_ {
+                return super.buildItemModel(item)
+                        .annotationLabel(item.entry?.watchers.toString())
+                        .annotationIcon(R.drawable.ic_eye_12dp)
+            }
+        }
+    }
+
+    override fun onItemClicked(item: TrendingListItem) {
+        val sharedElements = SharedElementHelper()
+        grid_recyclerview.findViewHolderForItemId(item.generateStableId())?.let {
+            sharedElements.addSharedElement(it.itemView, "poster")
+        }
+        viewModel.onItemClicked(item, homeNavigator, sharedElements)
+    }
 }

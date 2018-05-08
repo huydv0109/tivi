@@ -16,23 +16,42 @@
 
 package me.banes.chris.tivi.home.watched
 
+import android.arch.lifecycle.ViewModelProviders
 import android.os.Bundle
 import android.view.View
 import kotlinx.android.synthetic.main.fragment_rv_grid.*
 import me.banes.chris.tivi.R
-import me.banes.chris.tivi.data.entities.WatchedListItem
+import me.banes.chris.tivi.SharedElementHelper
+import me.banes.chris.tivi.data.entities.WatchedShowListItem
+import me.banes.chris.tivi.home.HomeNavigator
+import me.banes.chris.tivi.home.HomeNavigatorViewModel
 import me.banes.chris.tivi.util.EntryGridFragment
 
-class WatchedShowsFragment : EntryGridFragment<WatchedListItem, WatchedShowsViewModel>(WatchedShowsViewModel::class.java) {
+class WatchedShowsFragment : EntryGridFragment<WatchedShowListItem, WatchedShowsViewModel>(WatchedShowsViewModel::class.java) {
+
+    private lateinit var homeNavigator: HomeNavigator
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        homeNavigator = ViewModelProviders.of(activity!!, viewModelFactory).get(HomeNavigatorViewModel::class.java)
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        toolbar.apply {
+
+        grid_toolbar.apply {
             title = getString(R.string.library_watched)
             setNavigationOnClickListener {
-                viewModel.onUpClicked()
+                viewModel.onUpClicked(homeNavigator)
             }
         }
     }
 
+    override fun onItemClicked(item: WatchedShowListItem) {
+        val sharedElements = SharedElementHelper()
+        grid_recyclerview.findViewHolderForItemId(item.generateStableId())?.let {
+            sharedElements.addSharedElement(it.itemView, "poster")
+        }
+        viewModel.onItemClicked(item, homeNavigator, sharedElements)
+    }
 }

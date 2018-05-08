@@ -16,76 +16,100 @@
 
 package me.banes.chris.tivi.home.library
 
-import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
-import android.content.Context
 import android.os.Bundle
-import android.support.v4.util.ArrayMap
 import android.support.v7.widget.GridLayoutManager
 import android.view.LayoutInflater
-import android.view.MenuItem
+import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
-import com.xwray.groupie.GroupAdapter
-import com.xwray.groupie.Item
-import com.xwray.groupie.ViewHolder
-import kotlinx.android.synthetic.main.fragment_discover.*
-import kotlinx.android.synthetic.main.header_item.view.*
+import kotlinx.android.synthetic.main.fragment_summary.*
 import me.banes.chris.tivi.R
+import me.banes.chris.tivi.SharedElementHelper
+import me.banes.chris.tivi.data.Entry
+import me.banes.chris.tivi.data.entities.ListItem
+import me.banes.chris.tivi.data.entities.MyShowsEntry
+import me.banes.chris.tivi.data.entities.WatchedShowEntry
+import me.banes.chris.tivi.extensions.observeK
 import me.banes.chris.tivi.home.HomeFragment
+import me.banes.chris.tivi.home.HomeNavigator
+import me.banes.chris.tivi.home.HomeNavigatorViewModel
 import me.banes.chris.tivi.ui.SpacingItemDecorator
-import me.banes.chris.tivi.ui.groupieitems.ShowPosterItem
-import me.banes.chris.tivi.ui.groupieitems.ShowPosterUpdatingSection
+import me.banes.chris.tivi.util.GridToGridTransitioner
 
 class LibraryFragment : HomeFragment<LibraryViewModel>() {
 
+    private lateinit var homeNavigator: HomeNavigator
     private lateinit var gridLayoutManager: GridLayoutManager
-    private val groupAdapter = GroupAdapter<ViewHolder>()
 
-    private val groups = ArrayMap<LibraryViewModel.Section, ShowPosterUpdatingSection>()
+    private val controller = LibraryEpoxyController(object : LibraryEpoxyController.Callbacks {
+        override fun onMyShowsHeaderClicked(items: List<ListItem<MyShowsEntry>>?) {
+            val sharedElementHelper = SharedElementHelper()
+            items?.forEach { addSharedElementEntry(it, sharedElementHelper) }
+            viewModel.onMyShowsHeaderClicked(homeNavigator, sharedElementHelper)
+        }
 
-    override fun onAttach(context: Context) {
-        super.onAttach(context)
-        viewModel = ViewModelProviders.of(this, viewModelFactory)
-                .get(LibraryViewModel::class.java)
+        override fun onWatchedHeaderClicked(items: List<ListItem<WatchedShowEntry>>?) {
+            val sharedElementHelper = SharedElementHelper()
+            items?.forEach { addSharedElementEntry(it, sharedElementHelper) }
+            viewModel.onWatchedHeaderClicked(homeNavigator, sharedElementHelper)
+        }
+
+        override fun onItemClicked(item: ListItem<out Entry>) {
+            val sharedElementHelper = SharedElementHelper()
+            addSharedElementEntry(item, sharedElementHelper, "poster")
+            viewModel.onItemPostedClicked(homeNavigator, item.show!!, sharedElementHelper)
+        }
+
+        private fun addSharedElementEntry(
+            item: ListItem<out Entry>,
+            sharedElementHelper: SharedElementHelper,
+            transitionName: String? = item.show?.homepage
+        ) {
+            summary_rv.findViewHolderForItemId(item.generateStableId())?.let {
+                sharedElementHelper.addSharedElement(it.itemView, transitionName)
+            }
+        }
+    })
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        viewModel = ViewModelProviders.of(this, viewModelFactory).get(LibraryViewModel::class.java)
+        homeNavigator = ViewModelProviders.of(activity!!, viewModelFactory).get(HomeNavigatorViewModel::class.java)
+
+        GridToGridTransitioner.setupFirstFragment(this,
+                intArrayOf(R.id.summary_appbarlayout, R.id.summary_status_scrim))
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        return inflater.inflate(R.layout.fragment_discover, container, false)
+        return inflater.inflate(R.layout.fragment_summary, container, false)
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
 
-        viewModel.data.observe(this, Observer {
-            it?.run {
-                updateAdapter(it)
-            }
-        })
+        viewModel.data.observeK(this) { model ->
+            controller.setData(model?.myShows, model?.watched, model?.tmdbImageUrlProvider)
+            scheduleStartPostponedTransitions()
+        }
     }
 
-    override fun onViewCreated(view: View?, savedInstanceState: Bundle?) {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        gridLayoutManager = discover_rv.layoutManager as GridLayoutManager
-        gridLayoutManager.spanSizeLookup = groupAdapter.spanSizeLookup
+        postponeEnterTransition()
 
-        groupAdapter.apply {
-            setOnItemClickListener { item, _ ->
-                when (item) {
-                    is HeaderItem -> viewModel.onSectionHeaderClicked(item.section)
-                    is ShowPosterItem -> viewModel.onItemPostedClicked(item.show)
-                }
-            }
-            spanCount = gridLayoutManager.spanCount
-        }
+        // Setup span and columns
+        gridLayoutManager = summary_rv.layoutManager as GridLayoutManager
+        gridLayoutManager.spanSizeLookup = controller.spanSizeLookup
+        controller.spanCount = gridLayoutManager.spanCount
 
-        discover_rv.apply {
-            adapter = groupAdapter
+        summary_rv.apply {
+            adapter = controller.adapter
             addItemDecoration(SpacingItemDecorator(paddingLeft))
         }
 
-        discover_toolbar?.apply {
+        summary_toolbar.apply {
             title = getString(R.string.library_title)
             inflateMenu(R.menu.home_toolbar)
             setOnMenuItemClickListener {
@@ -94,56 +118,13 @@ class LibraryFragment : HomeFragment<LibraryViewModel>() {
         }
     }
 
-    override fun findUserAvatarMenuItem(): MenuItem? {
-        return discover_toolbar.menu.findItem(R.id.home_menu_user_avatar)
-    }
-
-    override fun findUserLoginMenuItem(): MenuItem? {
-        return discover_toolbar.menu.findItem(R.id.home_menu_user_login)
-    }
-
-    private fun updateAdapter(data: List<LibraryViewModel.SectionPage>) {
-        if (groups.size != data.size) {
-            groups.clear()
-            for (section in data) {
-                val group = ShowPosterUpdatingSection()
-                groups[section.section] = group
-                group.setHeader(HeaderItem(section.section))
-                group.setPlaceholder(EmptyPlaceholder())
-                groupAdapter.add(group)
-            }
-        }
-        val spanCount = gridLayoutManager.spanCount
-        for (section in data) {
-            groups[section.section]?.update(section.items.mapNotNull { it.show }.take(spanCount * 2))
-        }
-    }
-
-    private fun titleFromSection(section: LibraryViewModel.Section) = when (section) {
-        LibraryViewModel.Section.WATCHED -> getString(R.string.library_watched)
-        else -> "FIXME"
-    }
+    override fun getMenu(): Menu? = summary_toolbar.menu
 
     internal fun scrollToTop() {
-        discover_rv.apply {
+        summary_rv.apply {
             stopScroll()
             smoothScrollToPosition(0)
         }
+        summary_appbarlayout.setExpanded(true)
     }
-
-    internal inner class HeaderItem(val section: LibraryViewModel.Section) : Item<ViewHolder>() {
-        override fun getLayout() = R.layout.header_item
-
-        override fun bind(viewHolder: ViewHolder, position: Int) {
-            viewHolder.itemView.header_title.text = titleFromSection(section)
-        }
-    }
-
-    internal inner class EmptyPlaceholder : Item<ViewHolder>() {
-        override fun getLayout() = R.layout.empty_state
-
-        override fun bind(viewHolder: ViewHolder, position: Int) {
-        }
-    }
-
 }

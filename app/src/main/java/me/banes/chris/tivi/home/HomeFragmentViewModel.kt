@@ -17,19 +17,18 @@
 package me.banes.chris.tivi.home
 
 import android.arch.lifecycle.LiveData
+import android.arch.lifecycle.LiveDataReactiveStreams
 import android.arch.lifecycle.MutableLiveData
-import me.banes.chris.tivi.AppNavigator
+import io.reactivex.rxkotlin.plusAssign
 import me.banes.chris.tivi.data.entities.TraktUser
-import me.banes.chris.tivi.extensions.plusAssign
 import me.banes.chris.tivi.trakt.TraktManager
-import me.banes.chris.tivi.util.ReactiveLiveData
-import me.banes.chris.tivi.util.RxAwareViewModel
+import me.banes.chris.tivi.util.TiviViewModel
 import net.openid.appauth.AuthState
+import timber.log.Timber
 
 abstract class HomeFragmentViewModel(
-        private val traktManager: TraktManager,
-        private val appNavigator: AppNavigator)
-    : RxAwareViewModel() {
+    private val traktManager: TraktManager
+) : TiviViewModel() {
 
     enum class AuthUiState {
         LOGGED_IN, LOGGED_OUT
@@ -37,12 +36,13 @@ abstract class HomeFragmentViewModel(
 
     val authUiState = MutableLiveData<AuthUiState>()
 
-    val userProfileLiveData: LiveData<TraktUser> = ReactiveLiveData(traktManager.userObservable())
+    val userProfileLiveData: LiveData<TraktUser> = LiveDataReactiveStreams.fromPublisher(traktManager.userObservable())
 
     init {
         authUiState.value = AuthUiState.LOGGED_OUT
 
-        disposables += traktManager.stateSubject.subscribe { handleAuthState(it) }
+        disposables += traktManager.state
+                .subscribe(::handleAuthState, Timber::e)
     }
 
     private fun handleAuthState(state: AuthState?) {
@@ -59,12 +59,7 @@ abstract class HomeFragmentViewModel(
         startAuthProcess(0)
     }
 
-    fun onSettingsItemClicked() {
-        appNavigator.startSettings()
-    }
-
     private fun startAuthProcess(requestCode: Int) {
         traktManager.startAuth(requestCode)
     }
-
 }

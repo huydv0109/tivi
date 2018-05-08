@@ -2,10 +2,11 @@ version: 2.0
 
 defaults: &defaults
   docker:
-    - image: circleci/android:api-26-alpha
+    - image: circleci/android:api-27-alpha
   working_directory: ~/tivi
   environment:
-    _JAVA_OPTIONS: "-Xmx1400m -XX:ParallelGCThreads=2 -XX:ConcGCThreads=2 -XX:ParallelGCThreads=2 -Djava.util.concurrent.ForkJoinPool.common.parallelism=2"
+    JAVA_TOOL_OPTIONS: "-Xmx1024m"
+    GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dkotlin.incremental=false"
     TERM: dumb
 
 update_sdk: &update_sdk
@@ -14,7 +15,7 @@ update_sdk: &update_sdk
     mkdir "$ANDROID_HOME/licenses" || true
     echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > "$ANDROID_HOME/licenses/android-sdk-license"
     echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
-    echo y | android update sdk --no-ui --all --filter "platform-tools"
+    sdkmanager "platform-tools" "platforms;android-27"
 
 jobs:
   build:
@@ -27,19 +28,20 @@ jobs:
           key: jars-{{ checksum "build.gradle" }}-{{ checksum  "app/build.gradle" }}
       - run:
           name: Download Dependencies
-          command: ./gradlew dependencies --no-daemon
+          command: ./gradlew dependencies
       - run:
           name: Decrypt secrets
           command: signing/setup.sh $ENCRYPT_KEY
       - run:
           name: Check and assemble APKs
-          command: ./gradlew clean check --no-daemon
+          command: ./gradlew check assemble dependencyUpdates
       - run:
           name: Cleanup secrets
           command: signing/cleanup.sh
       - save_cache:
           paths:
-            - ~/.gradle
+            - ~/.gradle/caches
+            - ~/.gradle/wrapper
           key: jars-{{ checksum "build.gradle" }}-{{ checksum  "app/build.gradle" }}
       - store_artifacts:
           path: app/build/outputs/apk
@@ -47,12 +49,14 @@ jobs:
       - store_artifacts:
           path: app/build/reports
           destination: reports
+      - store_artifacts:
+          path: build/dependencyUpdates
+          destination: dependencyUpdates
       - store_test_results:
           path: app/build/test-results
       - persist_to_workspace:
           root: .
           paths:
-            - .gradle
             - build
             - app/build
   deploy_to_play:
@@ -70,7 +74,7 @@ jobs:
           command: signing/setup.sh $ENCRYPT_KEY
       - run:
           name: Deploy to Alpha channel
-          command: ./gradlew publishRelease --no-daemon
+          command: ./gradlew publishRelease
       - run:
           name: Cleanup secrets
           command: signing/cleanup.sh

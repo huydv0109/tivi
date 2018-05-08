@@ -3,11 +3,15 @@
 /local.properties
 /.idea/workspace.xml
 /.idea/libraries
+/.idea/caches
 .DS_Store
-/build
-/captures
+build
+captures
 .externalNativeBuild
 
 # Do not commit plain release keys
 signing/app-release.jks
 signing/play-account.p12
+
+# Do not commit firebase config
+google-services.json

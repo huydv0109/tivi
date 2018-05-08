@@ -18,11 +18,13 @@ package me.banes.chris.tivi.home
 
 import dagger.Module
 import dagger.Provides
+import me.banes.chris.tivi.AppNavigator
+import me.banes.chris.tivi.TiviAppActivityNavigator
 
 @Module
 class HomeModule {
-
     @Provides
-    fun provideNavigator(activity: HomeActivity): HomeNavigator = activity.navigator
-
+    fun provideAppNavigator(activity: HomeActivity): AppNavigator {
+        return TiviAppActivityNavigator(activity)
+    }
 }

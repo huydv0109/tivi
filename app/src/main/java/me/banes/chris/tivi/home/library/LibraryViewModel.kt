@@ -17,38 +17,35 @@
 package me.banes.chris.tivi.home.library
 
 import android.arch.lifecycle.MutableLiveData
-import me.banes.chris.tivi.AppNavigator
-import me.banes.chris.tivi.calls.WatchedCall
-import me.banes.chris.tivi.data.Entry
-import me.banes.chris.tivi.data.entities.ListItem
+import io.reactivex.rxkotlin.Flowables
+import io.reactivex.rxkotlin.plusAssign
+import me.banes.chris.tivi.SharedElementHelper
 import me.banes.chris.tivi.data.entities.TiviShow
-import me.banes.chris.tivi.extensions.plusAssign
 import me.banes.chris.tivi.home.HomeFragmentViewModel
 import me.banes.chris.tivi.home.HomeNavigator
+import me.banes.chris.tivi.tmdb.TmdbManager
 import me.banes.chris.tivi.trakt.TraktManager
+import me.banes.chris.tivi.trakt.calls.MyShowsCall
+import me.banes.chris.tivi.trakt.calls.WatchedShowsCall
 import me.banes.chris.tivi.util.AppRxSchedulers
 import timber.log.Timber
 import javax.inject.Inject
 
 class LibraryViewModel @Inject constructor(
-        private val schedulers: AppRxSchedulers,
-        private val watchedCall: WatchedCall,
-        private val navigator: HomeNavigator,
-        appNavigator: AppNavigator,
-        traktManager: TraktManager) : HomeFragmentViewModel(traktManager, appNavigator) {
-
-    data class SectionPage(val section: Section, val items: List<out ListItem<out Entry>>)
-
-    enum class Section {
-        WHATS_NEXT, WATCHED
-    }
-
-    val data = MutableLiveData<List<SectionPage>>()
+    schedulers: AppRxSchedulers,
+    private val watchedShowsCall: WatchedShowsCall,
+    private val myShowsCall: MyShowsCall,
+    traktManager: TraktManager,
+    tmdbManager: TmdbManager
+) : HomeFragmentViewModel(traktManager) {
+    val data = MutableLiveData<LibraryViewState>()
 
     init {
-        disposables += watchedCall.data()
-                .map { SectionPage(Section.WATCHED, it.take(20)) }
-                .map { listOf(it) }
+        disposables += Flowables.combineLatest(
+                watchedShowsCall.data().map { it.take(20) },
+                myShowsCall.data().map { it.take(20) },
+                tmdbManager.imageProvider,
+                ::LibraryViewState)
                 .observeOn(schedulers.main)
                 .subscribe(data::setValue, Timber::e)
 
@@ -56,26 +53,25 @@ class LibraryViewModel @Inject constructor(
     }
 
     private fun refresh() {
-        disposables += watchedCall.refresh(Unit)
-                .subscribe(this::onSuccess, this::onRefreshError)
-    }
-
-    private fun onSuccess() {
-        // TODO nothing really to do here
-    }
-
-    private fun onRefreshError(t: Throwable) {
-        Timber.e(t, "Error while refreshing")
-    }
-
-    fun onSectionHeaderClicked(section: Section) {
-        when (section) {
-            Section.WATCHED -> navigator.showWatched()
+        launchWithParent {
+            try {
+                watchedShowsCall.refresh(Unit)
+            } catch (e: Exception) {
+                // TODO this shouldn't live here
+                Timber.e(e, "Error while refreshing")
+            }
         }
     }
 
-    fun onItemPostedClicked(show: TiviShow) {
-        navigator.showShowDetails(show)
+    fun onWatchedHeaderClicked(navigator: HomeNavigator, sharedElements: SharedElementHelper) {
+        navigator.showWatched(sharedElements)
     }
 
+    fun onMyShowsHeaderClicked(navigator: HomeNavigator, sharedElements: SharedElementHelper) {
+        navigator.showMyShows(sharedElements)
+    }
+
+    fun onItemPostedClicked(navigator: HomeNavigator, show: TiviShow, sharedElements: SharedElementHelper? = null) {
+        navigator.showShowDetails(show, sharedElements)
+    }
 }
